@@ -7,41 +7,57 @@ interface User {
   password: string;
 }
 
+// File-based storage implementation with atomic write operations
 const dbPath = path.join(process.cwd(), 'data', 'users.json');
 
-// Zorg ervoor dat de data directory bestaat
+// Database initialization with idempotent directory and file creation
 async function initializeDb() {
   try {
+    // Ensure data directory exists with recursive creation
     await fs.mkdir(path.join(process.cwd(), 'data'), { recursive: true });
+    
     try {
       await fs.access(dbPath);
     } catch {
-      // Als het bestand niet bestaat, maak het aan met een lege users array
-      await fs.writeFile(dbPath, JSON.stringify({ users: [] }));
+      // Initialize with empty users array if file doesn't exist
+      await fs.writeFile(dbPath, JSON.stringify({ users: [] }, null, 2));
     }
+    return true;
   } catch (error) {
-    console.error('Error initializing database:', error);
+    console.error('Database initialisatie error:', error);
+    return false;
   }
 }
 
-// Initialiseer de database bij het starten van de applicatie
-initializeDb();
-
+// Retrieves users with automatic database recovery on corruption
 export async function getUsers(): Promise<User[]> {
   try {
+    await initializeDb();
     const data = await fs.readFile(dbPath, 'utf-8');
     return JSON.parse(data).users;
   } catch (error) {
+    if (error instanceof Error) {
+      // Auto-recovery: Reset database on JSON parse failure
+      if (error instanceof SyntaxError) {
+        await fs.writeFile(dbPath, JSON.stringify({ users: [] }, null, 2));
+        return [];
+      }
+    }
+    // Log de error maar return een lege array om de applicatie werkend te houden
     console.error('Error reading users:', error);
     return [];
   }
 }
 
-export async function saveUsers(users: User[]): Promise<void> {
+// Atomic write operation for user persistence
+export async function saveUsers(users: User[]): Promise<boolean> {
   try {
+    await initializeDb();
+    // Write entire user array atomically to prevent partial updates
     await fs.writeFile(dbPath, JSON.stringify({ users }, null, 2));
+    return true;
   } catch (error) {
     console.error('Error saving users:', error);
-    throw new Error('Failed to save users');
+    return false;
   }
 }

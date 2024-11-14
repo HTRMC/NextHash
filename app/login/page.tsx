@@ -22,24 +22,27 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const res = await fetch('/api/login', {
+      const res = await fetch('/api/auth', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         },
-        body: JSON.stringify(formData)
+        body: JSON.stringify({
+          type: 'login',
+          ...formData
+        })
       });
 
+      const data = await res.json();
+
       if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.error || 'Er is een fout opgetreden');
+        throw new Error(data.error);
       }
 
-      const data = await res.json();
-      console.log('Login succesvol:', data);
-      
-      router.push('/dashboard');
+      if (data.redirect) {
+        router.push(data.redirect);
+      }
     } catch (err) {
       console.error('Login error:', err);
       setError(err instanceof Error ? err.message : 'Er is een fout opgetreden');

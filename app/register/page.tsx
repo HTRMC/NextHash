@@ -24,21 +24,27 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
-      const res = await fetch('/api/register', {
+      const res = await fetch('/api/auth', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         },
-        body: JSON.stringify(formData)
+        body: JSON.stringify({
+          type: 'register',
+          ...formData
+        })
       });
 
+      const data = await res.json();
+
       if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.error || 'Er is een fout opgetreden');
+        throw new Error(data.error);
       }
 
-      router.push('/login');
+      if (data.redirect) {
+        router.push(data.redirect);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Er is een fout opgetreden');
     } finally {
